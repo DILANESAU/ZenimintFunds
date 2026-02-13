@@ -172,7 +172,7 @@ class FinanceViewModel(private val dao: FinanceDao) : ViewModel() {
 
             // 2. Opcional: Crear el registro en el Dashboard para que se reste de tu dinero
             if (crearGastoEnDashboard && totalPagado > 0) {
-                val gastoDelPago = com.fintechforge.zenimintfunds.data.GastoDiario(
+                val gastoDelPago = GastoDiario(
                     monto = totalPagado,
                     descripcion = "Pago Tarjeta: $nombreBanco",
                     categoria = "Deudas / Crédito",

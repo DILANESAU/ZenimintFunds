@@ -8,13 +8,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,7 +56,7 @@ fun MsiScreen(viewModel: FinanceViewModel, navController: NavController, tarjeta
                 title = { Text("Control de MSI") },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Atrás")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
                     }
                 }
             )
@@ -112,7 +113,7 @@ fun MsiScreen(viewModel: FinanceViewModel, navController: NavController, tarjeta
                         )
                     }
                 }
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
             }
 
             // 3. LISTA DE COMPRAS
@@ -298,7 +299,7 @@ fun MsiFormDialog(
         confirmButton = {
             Button(onClick = {
                 if (desc.isNotEmpty() && total.isNotEmpty() && cuotas.isNotEmpty()) {
-                    val quienPaga = if (deudor.isBlank()) "Yo" else deudor
+                    val quienPaga = deudor.ifBlank { "Yo" }
                     onConfirm(desc, total.toDouble(), cuotas.toInt(), quienPaga)
                 }
             }) { Text("Guardar") }
