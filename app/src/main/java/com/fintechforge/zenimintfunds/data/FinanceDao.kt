@@ -65,4 +65,10 @@ interface FinanceDao {
     // Suma total automática (para no usar Excel)
     @Query("SELECT SUM(monto) FROM gastos_diarios WHERE fechaGasto BETWEEN :inicio AND :fin")
     fun obtenerSumaGastosPorFecha(inicio: Long, fin: Long): Flow<Double?>
+
+    @Update suspend fun actualizarGasto(gasto: GastoDiario)
+    @Delete suspend fun eliminarGasto(gasto: GastoDiario)
+    @Update suspend fun actualizarIngreso(ingreso: Ingreso)
+    @Update suspend fun actualizarTarjeta(tarjeta: TarjetaCredito)
+    @Delete suspend fun eliminarCompraMSI(compra: CompraMSI)
 }

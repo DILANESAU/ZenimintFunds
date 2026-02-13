@@ -43,7 +43,8 @@ data class CompraMSI(
     val montoTotalOriginal: Double,
     val cuotasTotales: Int,
     val fechaCompra: Long,
-    val cuotasPagadas: Int = 0
+    val cuotasPagadas: Int = 0,
+    val deudor: String = "Yo"
 ) {
     fun montoPagoMensual(): Double = montoTotalOriginal / cuotasTotales
 
