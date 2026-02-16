@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreditCard
@@ -61,8 +62,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             // Asegúrate de usar tu tema si tienes uno, o MaterialTheme por defecto
-            MaterialTheme {
-                MainAppStructure(viewModel)
+            com.fintechforge.zenimintfunds.ui.theme.ZenimintFundsTheme {
+                // Un Surface general para que el fondo de toda la app sea el correcto
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    MainAppStructure(viewModel)
+                }
             }
         }
     }
