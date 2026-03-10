@@ -9,14 +9,24 @@ enum class FrecuenciaPago {
     SEMANAL, QUINCENAL, MENSUAL
 }
 
+
 @Entity(tableName = "ingresos")
 data class Ingreso(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val monto: Double,
-    val fuente: String,
-    val frecuencia: FrecuenciaPago,
-    val fechaRegistro: Long
+    val descripcion: String,
+    val fechaIngreso: Long,
+    val categoria: String = "General",
+
+    val esRecurrente: Boolean = false,
+    val frecuencia: String = "Ninguna", // "Semanal", "Quincenal", "Mensual"
+    val fechaProximoPago: Long? = null,
+
+    // --- NUEVOS CAMPOS PRO ---
+    val diaPago1: Int? = null, // Semanal: 1(Dom) a 7(Sab). Mensual/Quincenal: 1 al 31
+    val diaPago2: Int? = null  // Solo para quincenal: 1 al 31 (Ej: 15 y 30)
 )
+
 
 @Entity(tableName = "tarjetas_credito")
 data class TarjetaCredito(
@@ -58,6 +68,22 @@ data class GastoDiario(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val monto: Double,
     val descripcion: String,
+    val fechaGasto: Long,
     val categoria: String,
-    val fechaGasto: Long
+    val tarjetaId: Int? = null // <--- NULL si es efectivo/débito, ID si es crédito
+)
+
+@Entity(tableName = "deudores")
+data class Deudor(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val nombre: String
+)
+
+@Entity(tableName = "categorias")
+data class Categoria(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val nombre: String,
+    val icono: String = "📦",
+    val colorHex: Long = 0xFF00BFA5,
+    val tipo: String
 )

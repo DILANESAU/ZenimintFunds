@@ -14,8 +14,14 @@ interface FinanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarIngreso(ingreso: Ingreso)
 
-    @Query("SELECT * FROM ingresos ORDER BY fechaRegistro DESC")
-    fun obtenerIngresos(): Flow<List<Ingreso>>
+    // --- LAS QUE FALTABAN PARA EL DASHBOARD ---
+    @Query("SELECT * FROM ingresos ORDER BY fechaIngreso DESC")
+    fun obtenerTodosLosIngresos(): Flow<List<Ingreso>>
+
+    @Query("SELECT * FROM ingresos WHERE fechaIngreso BETWEEN :inicio AND :fin ORDER BY fechaIngreso DESC")
+    fun obtenerIngresosPorFecha(inicio: Long, fin: Long): Flow<List<Ingreso>>
+    @Query("SELECT * FROM ingresos WHERE esRecurrente = 1 AND fechaProximoPago <= :fechaActual")
+    suspend fun obtenerIngresosPendientesDeCobro(fechaActual: Long): List<Ingreso>
 
     @Delete
     suspend fun eliminarIngreso(ingreso: Ingreso)
@@ -58,4 +64,29 @@ interface FinanceDao {
     @Update suspend fun actualizarIngreso(ingreso: Ingreso)
     @Update suspend fun actualizarTarjeta(tarjeta: TarjetaCredito)
     @Delete suspend fun eliminarCompraMSI(compra: CompraMSI)
+    // --- GESTIÓN DE DEUDORES ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertarDeudor(deudor: Deudor)
+
+    @Query("SELECT * FROM deudores ORDER BY nombre ASC")
+    fun obtenerDeudores(): Flow<List<Deudor>>
+
+    @Delete
+    suspend fun eliminarDeudor(deudor: Deudor)
+
+    // --- GESTIÓN DE CATEGORÍAS (FILTRADAS) ---
+    @Query("SELECT * FROM categorias WHERE tipo = :tipo ORDER BY nombre ASC")
+    fun obtenerCategoriasPorTipo(tipo: String): Flow<List<Categoria>>
+
+    @Query("SELECT COUNT(*) FROM categorias WHERE tipo = :tipo")
+    suspend fun contarCategoriasPorTipo(tipo: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertarCategoria(categoria: Categoria)
+
+    @Delete
+    suspend fun eliminarCategoria(categoria: Categoria)
+
+    @Query("SELECT * FROM gastos_diarios WHERE tarjetaId = :tarjetaId AND fechaGasto >= :inicioMes")
+    fun obtenerGastosDirectosTarjeta(tarjetaId: Int, inicioMes: Long): Flow<List<GastoDiario>>
 }

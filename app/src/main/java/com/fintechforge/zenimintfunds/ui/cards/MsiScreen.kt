@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -32,15 +33,27 @@ import com.fintechforge.zenimintfunds.data.CompraMSI
 @Composable
 fun MsiScreen(viewModel: FinanceViewModel, navController: NavController, tarjetaId: Int) {
     val compras by viewModel.obtenerComprasPorTarjeta(tarjetaId).collectAsState(initial = emptyList())
+    val gastosDirectos by viewModel.obtenerGastosDirectosTarjeta(tarjetaId).collectAsState(initial = emptyList())
+    val deudores by viewModel.deudores.collectAsState()
+
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var compraAEditar by remember { mutableStateOf<CompraMSI?>(null) }
     var showPaymentConfirmDialog by remember { mutableStateOf(false) }
 
-    val pagoTotalAlBanco = compras.sumOf { it.montoTotalOriginal / it.cuotasTotales }
-    val miDeudaMensual = compras.filter { it.deudor == "Yo" }.sumOf { it.montoTotalOriginal / it.cuotasTotales }
-    val cobranzaMensual = compras.filter { it.deudor != "Yo" }.groupBy { it.deudor }.mapValues { entry -> entry.value.sumOf { it.montoTotalOriginal / it.cuotasTotales } }
+    // --- CÁLCULOS MATEMÁTICOS ---
+    val pagoMsi = compras.sumOf { it.montoTotalOriginal / it.cuotasTotales }
+    val pagoDirecto = gastosDirectos.sumOf { it.monto }
+    val pagoTotalAlBanco = pagoMsi + pagoDirecto // Suma de ambos mundos
+
+    // Tu deuda personal (MSI de "Yo" + Todos los gastos directos que por definición son tuyos)
+    val miDeudaMensual = compras.filter { it.deudor == "Yo" }.sumOf { it.montoTotalOriginal / it.cuotasTotales } + pagoDirecto
+
+    // Lo que otros te deben (Solo aplica para MSI en esta lógica)
+    val cobranzaMensual = compras.filter { it.deudor != "Yo" }
+        .groupBy { it.deudor }
+        .mapValues { entry -> entry.value.sumOf { it.montoTotalOriginal / it.cuotasTotales } }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -52,20 +65,11 @@ fun MsiScreen(viewModel: FinanceViewModel, navController: NavController, tarjeta
                         Icon(Icons.Default.ArrowBack, contentDescription = "Atrás")
                     }
                 },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background
-                )
+                scrollBehavior = scrollBehavior
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape // FAB totalmente circular clásico y elegante
-            ) {
+            FloatingActionButton(onClick = { showAddDialog = true }, shape = CircleShape) {
                 Icon(Icons.Default.Add, contentDescription = "Nueva Compra")
             }
         }
@@ -74,37 +78,39 @@ fun MsiScreen(viewModel: FinanceViewModel, navController: NavController, tarjeta
             modifier = Modifier.padding(padding).fillMaxSize(),
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
+            // --- HEADER: TOTAL A PAGAR ---
             item {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        "Pago para no generar intereses",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Total a pagar este mes", style = MaterialTheme.typography.labelMedium, color = Color.Gray)
                     Text(
                         "$${String.format("%,.2f", pagoTotalAlBanco)}",
-                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 48.sp, fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onBackground
+                        style = MaterialTheme.typography.displayLarge.copy(fontSize = 48.sp, fontWeight = FontWeight.Bold)
                     )
+
+                    if (pagoDirecto > 0) {
+                        Text(
+                            "Includes $${String.format("%,.0f", pagoDirecto)} de gastos directos",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
 
                     if (miDeudaMensual < pagoTotalAlBanco) {
                         Spacer(modifier = Modifier.height(8.dp))
                         SuggestionChip(
                             onClick = {},
-                            label = { Text("Tu parte: $${String.format("%,.2f", miDeudaMensual)}") },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            ),
+                            label = { Text("Tu parte real: $${String.format("%,.2f", miDeudaMensual)}") },
+                            colors = SuggestionChipDefaults.suggestionChipColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
                             border = null
                         )
                     }
                 }
             }
 
+            // --- BOTÓN DE REGISTRO ---
             if (pagoTotalAlBanco > 0) {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
@@ -114,30 +120,22 @@ fun MsiScreen(viewModel: FinanceViewModel, navController: NavController, tarjeta
                             modifier = Modifier.fillMaxWidth().height(56.dp),
                             shape = RoundedCornerShape(16.dp)
                         ) {
-                            Text("Registrar Pago del Mes", fontSize = 16.sp)
+                            Text("Pagar Tarjeta ($${String.format("%,.0f", pagoTotalAlBanco)})", fontSize = 16.sp)
                         }
                     }
                 }
             }
 
+            // --- SECCIÓN: COBRANZA ---
             if (cobranzaMensual.isNotEmpty()) {
                 item {
-                    Text(
-                        "Recuperar de terceros",
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Text("Recuperar de amigos", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp), color = MaterialTheme.colorScheme.primary)
                 }
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         cobranzaMensual.forEach { (nombre, monto) ->
                             FilterChip(
-                                selected = true,
-                                onClick = {},
+                                selected = true, onClick = {},
                                 label = { Text("$nombre: $${String.format("%,.0f", monto)}") },
                                 leadingIcon = { Icon(Icons.Default.Person, null, modifier = Modifier.size(16.dp)) }
                             )
@@ -146,52 +144,84 @@ fun MsiScreen(viewModel: FinanceViewModel, navController: NavController, tarjeta
                 }
             }
 
+            // --- SECCIÓN: MSI (DESGLOSE) ---
             if (compras.isNotEmpty()) {
                 item {
-                    Text(
-                        "Desglose",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 24.dp, top = 24.dp, bottom = 8.dp)
-                    )
+                    Text("Compras a Meses", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp))
                 }
                 items(compras) { compra ->
-                    MsiMinimalItem(
-                        compra = compra,
-                        onEdit = { compraAEditar = compra },
-                        onDelete = { viewModel.borrarCompra(compra) }
-                    )
-                    Divider(modifier = Modifier.padding(horizontal = 24.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    MsiMinimalItem(compra = compra, onEdit = { compraAEditar = compra }, onDelete = { viewModel.borrarCompra(compra) })
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                }
+            }
+
+            // --- SECCIÓN: GASTOS DIRECTOS DEL MES ---
+            if (gastosDirectos.isNotEmpty()) {
+                item {
+                    Text("Gastos Directos (Este mes)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp))
+                }
+                items(gastosDirectos) { gasto ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(gasto.descripcion, style = MaterialTheme.typography.bodyLarge)
+                            Text(gasto.categoria, style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        }
+                        Text("$${String.format("%,.2f", gasto.monto)}", fontWeight = FontWeight.Bold)
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
                 }
             }
         }
+    }
+
+    // --- DIÁLOGOS (Se mantienen igual, solo actualicé el texto de confirmación) ---
+    if (showPaymentConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showPaymentConfirmDialog = false },
+            title = { Text("Confirmar Pago") },
+            text = { Text("Se liquidarán tus gastos directos y se sumará un mes a tus MSI.\n\nTotal: $${String.format("%,.2f", pagoTotalAlBanco)}") },
+            confirmButton = {
+
+                Button(onClick = {
+                    viewModel.pagarMensualidadTarjeta(tarjetaId, crearGastoEnDashboard = true)
+                    showPaymentConfirmDialog = false
+                    navController.popBackStack()
+                }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))) {
+                    Text("Confirmar Pago")
+                }
+            },
+            dismissButton = { TextButton(onClick = { showPaymentConfirmDialog = false }) { Text("Cancelar") } }
+        )
     }
 
 
     if (showAddDialog) {
         MsiFormDialog(
             titulo = "Nueva Compra",
+            deudores = deudores,
             onDismiss = { showAddDialog = false },
-            onConfirm = { desc, total, cuotas, deudor ->
-                viewModel.agregarCompraMSI(tarjetaId, desc, total, cuotas, deudor)
+            onConfirm = { desc, total, cuotas, deudor, pagadas ->
+                viewModel.agregarCompraMSI(tarjetaId, desc, total, cuotas, deudor, pagadas)
                 showAddDialog = false
             }
         )
     }
 
+    // EN EDITAR:
     if (compraAEditar != null) {
         MsiFormDialog(
             titulo = "Editar Compra",
             compraInicial = compraAEditar,
             onDismiss = { compraAEditar = null },
-            onConfirm = { desc, total, cuotas, deudor ->
-                val compraActualizada = compraAEditar!!.copy(
-                    descripcion = desc,
-                    montoTotalOriginal = total,
-                    cuotasTotales = cuotas,
-                    deudor = deudor
-                )
-                viewModel.actualizarCompra(compraActualizada)
+            deudores = deudores,
+            onConfirm = { desc, total, cuotas, deudor, pagadas ->
+                viewModel.actualizarCompra(compraAEditar!!.copy(
+                    descripcion = desc, montoTotalOriginal = total, cuotasTotales = cuotas, deudor = deudor, cuotasPagadas = pagadas
+                ))
                 compraAEditar = null
             }
         )
@@ -280,96 +310,91 @@ fun MsiMinimalItem(
 @Composable
 fun MsiFormDialog(
     titulo: String,
-    compraInicial: CompraMSI? = null,
+    compraInicial: com.fintechforge.zenimintfunds.data.CompraMSI? = null,
+    deudores: List<com.fintechforge.zenimintfunds.data.Deudor>, // <-- NUEVO PARÁMETRO
     onDismiss: () -> Unit,
-    onConfirm: (String, Double, Int, String) -> Unit
+    onConfirm: (String, Double, Int, String, Int) -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var desc by remember { mutableStateOf(compraInicial?.descripcion ?: "") }
     var total by remember { mutableStateOf(compraInicial?.montoTotalOriginal?.toString() ?: "") }
-    var cuotas by remember { mutableStateOf(compraInicial?.cuotasTotales?.toString() ?: "") }
-    var deudor by remember { mutableStateOf(if (compraInicial?.deudor == "Yo") "" else compraInicial?.deudor ?: "") }
+    var cuotasTotales by remember { mutableStateOf(compraInicial?.cuotasTotales?.toString() ?: "") }
+    var cuotasPagadas by remember { mutableStateOf(compraInicial?.cuotasPagadas?.toString() ?: "") }
+    var deudor by remember { mutableStateOf(compraInicial?.deudor ?: "Yo") }
+
+    // Estado del menú desplegable
+    var expandedMenu by remember { mutableStateOf(false) }
+    // Creamos la lista de opciones: Siempre incluye "Yo" de primero, luego los amigos
+    val opcionesDeudor = listOf("Yo") + deudores.map { it.nombre }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
+                .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 48.dp)
-                .fillMaxWidth(),
+                .imePadding()
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                titulo,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            Text(titulo, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
 
-            OutlinedTextField(
-                value = desc,
-                onValueChange = { desc = it },
-                label = { Text("¿Qué compraste?") },
-                placeholder = { Text("Ej: iPhone 15") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            )
+            OutlinedTextField(value = desc, onValueChange = { desc = it }, label = { Text("¿Qué compraste?") }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp))
+            OutlinedTextField(value = total, onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) total = it }, label = { Text("Monto Total ($)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedTextField(
-                    value = total,
-                    onValueChange = { if (it.all { c -> c.isDigit() || c == '.' }) total = it },
-                    label = { Text("Monto Total ($)") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                OutlinedTextField(
-                    value = cuotas,
-                    onValueChange = { if (it.all { c -> c.isDigit() }) cuotas = it },
-                    label = { Text("Meses") }, // Texto corto
-                    modifier = Modifier.weight(0.5f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                OutlinedTextField(value = cuotasTotales, onValueChange = { if (it.all { c -> c.isDigit() }) cuotasTotales = it }, label = { Text("Total Meses") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
+                OutlinedTextField(value = cuotasPagadas, onValueChange = { if (it.all { c -> c.isDigit() }) cuotasPagadas = it }, label = { Text("Ya pagados") }, placeholder = { Text("Ej: 8") }, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), shape = RoundedCornerShape(12.dp))
             }
 
-            Column {
+            // --- EL MENÚ DESPLEGABLE MÁGICO ---
+            ExposedDropdownMenuBox(
+                expanded = expandedMenu,
+                onExpandedChange = { expandedMenu = !expandedMenu }
+            ) {
                 OutlinedTextField(
                     value = deudor,
-                    onValueChange = { deudor = it },
-                    label = { Text("¿Quién paga? (Opcional)") },
-                    placeholder = { Text("Déjalo vacío si eres tú") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    onValueChange = {},
+                    readOnly = true, // Evita que se abra el teclado
+                    label = { Text("¿Quién lo paga?") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedMenu) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                 )
-                // Sugerencias rápidas
-                Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SuggestionChip(onClick = { deudor = "Mamá" }, label = { Text("Mamá") })
-                    SuggestionChip(onClick = { deudor = "Pareja" }, label = { Text("Pareja") })
+                ExposedDropdownMenu(
+                    expanded = expandedMenu,
+                    onDismissRequest = { expandedMenu = false }
+                ) {
+                    opcionesDeudor.forEach { opcion ->
+                        DropdownMenuItem(
+                            text = { Text(opcion) },
+                            onClick = {
+                                deudor = opcion
+                                expandedMenu = false
+                            }
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Button(
                 onClick = {
-                    if (desc.isNotEmpty() && total.isNotEmpty() && cuotas.isNotEmpty()) {
-                        val quienPaga = if (deudor.isBlank()) "Yo" else deudor
-                        onConfirm(desc, total.toDouble(), cuotas.toInt(), quienPaga)
+                    if (desc.isNotEmpty() && total.isNotEmpty() && cuotasTotales.isNotEmpty()) {
+                        val pagadas = cuotasPagadas.toIntOrNull() ?: 0
+                        onConfirm(desc, total.toDouble(), cuotasTotales.toInt(), deudor, pagadas)
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(16.dp)
-            ) {
-                Text("Guardar Compra")
-            }
+            ) { Text("Guardar Compra") }
         }
     }
 }

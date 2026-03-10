@@ -10,9 +10,11 @@ import androidx.room.RoomDatabase
         Ingreso::class,
         TarjetaCredito::class,
         CompraMSI::class,
-        GastoDiario::class
+        GastoDiario::class,
+        Deudor::class,
+        Categoria::class
     ],
-    version = 2,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

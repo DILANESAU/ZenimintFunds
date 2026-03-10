@@ -65,6 +65,7 @@ dependencies {
     // Room
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.compose.foundation)
     ksp(libs.androidx.room.compiler)
 
     // Navegación e Iconos
@@ -73,6 +74,9 @@ dependencies {
 
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
+
+    //Biometric
+    implementation(libs.androidx.biometric)
 
     // Testing
     testImplementation(libs.junit)
